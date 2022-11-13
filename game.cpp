@@ -7,6 +7,13 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <iostream>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <cstring>
 
 struct Card {
   std::string suite, title;
@@ -16,22 +23,28 @@ struct Player {
   std::vector<Card> pack;
   void play(int pos, std::vector<Card> &board) {
     int r = pos - 1;
-    if (board.size() == 0 && pack.data()[r].title != "3" &&
-        pack.data()[r].title != "2") {
-      board.emplace_back(pack.at(r));
-      lastPlayed = pack.at(r);
-      std::cout << lastPlayed.title << " of " << lastPlayed.suite << std::endl;
-      rearrange(r);
-      std::cout << pack.size();
-    } else if (board.size() != 0 &&
-               board.data()[board.size()].suite == pack.data()[r].suite) {
-      board.emplace_back(pack.at(r));
-      rearrange(r);
+    if (r < pack.size() && r >= 0) {
+      if (board.size() == 0 && pack.data()[r].title != "3" &&
+          pack.data()[r].title != "2") {
+        board.emplace_back(pack.at(r));
+        lastPlayed = pack.at(r);
+        std::cout << lastPlayed.title << " of " << lastPlayed.suite
+                  << std::endl;
+        rearrange(r);
+      } else if (board.data()[board.size() - 1].suite == pack.data()[r].suite ||
+                 board.data()[board.size() - 1].title == pack.data()[r].title) {
+        board.emplace_back(pack.at(r));
+        rearrange(r);
+      } else {
+        std::cout << "Apigwe fine\n";
+        std::cout << pack.data()[r].suite << pack.data()[r].title << std::endl;
+      }
     } else {
-      std::cout << "Apigwe fine\n";
+      std::cout << "Invalid position\n";
     }
   }
   std::string getName() { return name; }
+  Card getLastPlayed() { return lastPlayed; }
 
 private:
   void rearrange(int r) {
@@ -75,8 +88,39 @@ void pickCard(std::vector<Card> &Deck, Player *player, int cards) {
     s--;
   }
 }
-bool checkWin(Player *player) { return true; }
+bool checkWin(Player *player) {
+  if (player->pack.size() == 0 && player->getLastPlayed().title != "King" &&
+      player->getLastPlayed().title != "Jack" &&
+      player->getLastPlayed().title != "Queen" &&
+      player->getLastPlayed().title != "2" &&
+      player->getLastPlayed().title != "3") {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+void rules(std::vector<Card> &board) {
+  Card kadi = board.back();
+  if (kadi.title == "Queen") {
+
+  } else if (kadi.title == "Ace") {
+    if (kadi.suite == "Spades") {
+      char input[1024];
+      std::string suite, title;
+
+    } else {
+    }
+  } else if (kadi.title == "2" || kadi.title == "3") {
+
+  } else if (kadi.title == "Jack") {
+  }
+}
 int main() {
+  bool gameOver = false;
+  bool turn = true;
+  char input[1024];
+  int pos;
   const std::string suite[4] = {"Spades", "Hearts", "Diamonds", "Clubs"};
   const std::string title[13] = {"Ace", "2", "3",  "4",    "5",     "6",   "7",
                                  "8",   "9", "10", "Jack", "Queen", "King"};
@@ -91,12 +135,40 @@ int main() {
       }
     }
   }
-  for (int i = 0; i < 53; i++) {
-    shuffle(Deck, 120);
-  }
-  // printDeck(Deck, Deck.size());
-  for (int i{0}; i < 4; i++) {
-    pickCard(Deck, &player[i], 4);
-  }
-  player[0].play(2, board);
+   int sock = socket(AF_INET6, SOCK_DGRAM, 0);
+    if(sock == -1){
+        std::cout << "Error creating socket" << std::endl;
+        return 1;
+    }
+    std::cout << "Socket created" << std::endl;
+    // bind the socket to a port
+    sockaddr_in6 hint;
+    hint.sin6_family = AF_INET6;
+    hint.sin6_port = htons(5410);
+    inet_pton(AF_INET6, "::", &hint.sin6_addr);
+    if(bind(sock, (sockaddr*)&hint, sizeof(hint)) == -1){
+        std::cout << "Can't bind socket! " << std::endl;
+        return 2;
+    }
+    // wait for a message
+    sockaddr_in6 client;
+    socklen_t clientLength = sizeof(client);
+    char buf[1024];
+    int bytesReceived;
+    while(true){
+        // clear the buffer
+        memset(buf, 0, 1024);
+        // wait for message
+        bytesReceived = recvfrom(sock, buf, 1024, 0, (sockaddr*)&client, &clientLength);
+        if(bytesReceived == -1){
+            std::cout << "Error in recvfrom()" << std::endl;
+            return 3;
+        }
+        // display message
+        std::cout << "Received: " << std::string(buf, 0, bytesReceived) << std::endl;
+        // send message back to client
+        sendto(sock, buf, bytesReceived + 1, 0, (sockaddr*)&client, clientLength);
+    }
+    // close the socket
+    close(sock);
 }
