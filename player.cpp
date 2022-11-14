@@ -3,34 +3,35 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <cstring>
 
-int main(){
-    int sock = socket(AF_INET6, SOCK_DGRAM, 0);
+int main(int argc,char** argv){
+    if(argc < 3){
+        std::cout << "Usage: ./client <name> <cards>" << std::endl;
+        return 0;
+    }
+    int sock = socket(AF_INET6, SOCK_STREAM, 0);
     if(sock == -1){
         std::cout << "Error creating socket" << std::endl;
         return 1;
     }
     std::cout << "Socket created" << std::endl;
-//    connect to remote server
-    sockaddr_in6 server;
-    server.sin6_family = AF_INET6;
-    server.sin6_port = htons(5410);
-    inet_pton(AF_INET6, "::1", &server.sin6_addr);
-    // send a datagram
+    sockaddr_in6 client;
+    client.sin6_family = AF_INET6;
+    client.sin6_port = htons(8000);
+    client.sin6_addr = in6addr_any;
+    if(connect(sock, (sockaddr*)&client, sizeof(client)) < 0){
+        std::cout << "Error connecting to server" << std::endl;
+        return 1;
+    }
+    std::cout << "Connected to server" << std::endl;
     char buf[1024];
-    std::string userInput;
-    do{
-        std::cout << "> ";
-        std::getline(std::cin, userInput);
-        if(userInput.size() > 0){
-            int sendRes = sendto(sock, userInput.c_str(), userInput.size() + 1, 0, (sockaddr*)&server, sizeof(server));
-            if(sendRes == -1){
-                std::cout << "Could not send to server! Whoops!\r" << std::endl;
-                continue;
-            }
-            // wait for response
-        }
-    }while(userInput.size() > 0);
-    // close the socket
-    close(sock);
+    strcpy(buf, argv[1]);
+    strcat(buf, " ");
+    strcat(buf, argv[2]);
+    send(sock, buf, strlen(buf), 0);
+    memset(buf, 0, 1024);
+    recv(sock, buf, 1024, 0);
+    std::cout << buf << std::endl;
+    std::cout << "Sent data to server" << std::endl;
 }
