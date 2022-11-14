@@ -1,9 +1,30 @@
 #include <iostream>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <cstring>
+
+void* send_msg(void* socket){
+    int sock = *((int*)socket);
+    while(true){
+        std::string msg;
+        std::getline(std::cin, msg);
+        send(sock, msg.c_str(), msg.size(), 0);
+    }
+}
+
+void* recv_msg(void* socket){
+    int sock = *((int*)socket);
+    char buf[1024];
+    memset(buf, 0, 1024);
+    while(int len = recv(sock, buf, 100, 0)>0){        
+        std::cout << buf << std::endl;
+        memset(buf, 0, 1024);
+    }
+    return nullptr;
+} 
 
 int main(int argc,char** argv){
     if(argc < 3){
@@ -29,9 +50,8 @@ int main(int argc,char** argv){
     strcpy(buf, argv[1]);
     strcat(buf, " ");
     strcat(buf, argv[2]);
-    send(sock, buf, strlen(buf), 0);
-    memset(buf, 0, 1024);
-    recv(sock, buf, 1024, 0);
-    std::cout << buf << std::endl;
-    std::cout << "Sent data to server" << std::endl;
+    pthread_t thread;
+    pthread_create(&thread, nullptr, send_msg,&sock);
+    pthread_create(&thread, nullptr, recv_msg,&sock);
+    pthread_join(thread, nullptr);
 }
