@@ -8,12 +8,23 @@
 #include <iterator>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <string.h>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
 
+void* recv_msg(void* socket){
+    int sock = *((int*)socket);
+    char buf[1024];
+    memset(buf, 0, 1024);
+    while(int len = recv(sock, buf, 100, 0)>0){        
+        std::cout << buf << std::endl;
+        memset(buf, 0, 1024);
+    }
+    return nullptr;
+} 
 struct Card {
   std::string suite, title;
 };
@@ -165,11 +176,11 @@ int main() {
   std::cout << "Connection accepted\n";
   // send a message to the client welcome to the game
   char client_message[2000];
-  std::string welcome = "A new client has joined the game";
-  // receive a message from the client
-  memset(client_message, 0, sizeof(client_message));
-  recv(client_sock, client_message, 2000, 0);
-  std::string name = strtok(client_message, " "),cards = strtok(NULL, " ");
+  pthread_t thread_id;
+  pthread_create(&thread_id, NULL, recv_msg, (void *)&client_sock);
+  // wait for the thread to finish
+  pthread_join(thread_id, NULL);
+  close(sock);
 }
 // commands:
 // play <card_position>
