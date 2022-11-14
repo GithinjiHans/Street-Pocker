@@ -1,19 +1,18 @@
 #include <algorithm>
+#include <arpa/inet.h>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <iterator>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <string.h>
 #include <string>
-#include <vector>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <iostream>
-#include <arpa/inet.h>
 #include <unistd.h>
-#include <netdb.h>
-#include <cstring>
+#include <vector>
 
 struct Card {
   std::string suite, title;
@@ -116,6 +115,13 @@ void rules(std::vector<Card> &board) {
   } else if (kadi.title == "Jack") {
   }
 }
+
+void addPlayer(std::vector<Player> &players, std::string name, int cards,
+               std::vector<Card> &Deck) {
+  players.emplace_back(Player(name));
+  pickCard(Deck, &players.back(), cards);
+}
+
 int main() {
   bool gameOver = false;
   bool turn = true;
@@ -124,7 +130,7 @@ int main() {
   const std::string suite[4] = {"Spades", "Hearts", "Diamonds", "Clubs"};
   const std::string title[13] = {"Ace", "2", "3",  "4",    "5",     "6",   "7",
                                  "8",   "9", "10", "Jack", "Queen", "King"};
-  Player player[4] = {{"Player 1"}, {"Player 2"}, {"Player 3"}, {"Player 4"}};
+  std::vector<Player> players;
   std::vector<Card> Deck;
   int n = 0;
   std::vector<Card> board;
@@ -135,40 +141,36 @@ int main() {
       }
     }
   }
-   int sock = socket(AF_INET6, SOCK_DGRAM, 0);
-    if(sock == -1){
-        std::cout << "Error creating socket" << std::endl;
-        return 1;
-    }
-    std::cout << "Socket created" << std::endl;
-    // bind the socket to a port
-    sockaddr_in6 hint;
-    hint.sin6_family = AF_INET6;
-    hint.sin6_port = htons(5410);
-    inet_pton(AF_INET6, "::", &hint.sin6_addr);
-    if(bind(sock, (sockaddr*)&hint, sizeof(hint)) == -1){
-        std::cout << "Can't bind socket! " << std::endl;
-        return 2;
-    }
-    // wait for a message
-    sockaddr_in6 client;
-    socklen_t clientLength = sizeof(client);
-    char buf[1024];
-    int bytesReceived;
-    while(true){
-        // clear the buffer
-        memset(buf, 0, 1024);
-        // wait for message
-        bytesReceived = recvfrom(sock, buf, 1024, 0, (sockaddr*)&client, &clientLength);
-        if(bytesReceived == -1){
-            std::cout << "Error in recvfrom()" << std::endl;
-            return 3;
-        }
-        // display message
-        std::cout << "Received: " << std::string(buf, 0, bytesReceived) << std::endl;
-        // send message back to client
-        sendto(sock, buf, bytesReceived + 1, 0, (sockaddr*)&client, clientLength);
-    }
-    // close the socket
-    close(sock);
+  int sock = socket(AF_INET6, SOCK_STREAM, 0);
+  if (sock == -1) {
+    std::cout << "Could not create socket\n";
+  }
+  int port = 8000;
+  struct sockaddr_in6 server;
+  server.sin6_family = AF_INET6;
+  server.sin6_addr = in6addr_any;
+  server.sin6_port = htons(port);
+  if (bind(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+    std::cout << "Bind failed\n";
+    return 1;
+  }
+  listen(sock, 6);
+  std::cout << "Waiting for incoming connections...\n";
+  int c = sizeof(struct sockaddr_in6);
+  struct sockaddr_in6 client;
+  int client_sock = accept(sock, (struct sockaddr *)&client, (socklen_t *)&c);
+  if (client_sock < 0) {
+    std::cout << "Accept failed\n";
+  }
+  std::cout << "Connection accepted\n";
+  // send a message to the client welcome to the game
+  char client_message[2000];
+  std::string welcome = "A new client has joined the game";
+  // receive a message from the client
+  memset(client_message, 0, sizeof(client_message));
+  recv(client_sock, client_message, 2000, 0);
+  std::string name = strtok(client_message, " "),cards = strtok(NULL, " ");
 }
+// commands:
+// play <card_position>
+// pick <cards>
